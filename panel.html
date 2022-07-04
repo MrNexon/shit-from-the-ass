@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(() => {
+            window.signal = [];
+            for (let i = 0; i < 600; i++) {
+                window.signal.push(0);
+            }
+            const server = new EventSource('http://localhost:8080/events?stream=main')
+            server.onmessage = (data) => {
+                let buff = data.data;
+                drawGraph(unpack(buff))
+            }
+        })
+
+
+        function unpack(str) {
+            var bytes = [];
+            for(var i = 0; i < str.length; i++) {
+                var char = str.charCodeAt(i);
+                bytes.push(char >>> 8);
+                bytes.push(char & 0xFF);
+            }
+            return bytes;
+        }
+
+        function drawGraph(data) {
+            const canvas = document.getElementById('can');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 600, 400);
+
+            window.signal = window.signal.slice(1);
+            window.signal.push(data[1]);
+
+            for (let i = 0; i < window.signal.length - 1; i++) {
+                const value = Math.round((window.signal[i] / 255) * 400);
+                const nextValue = Math.round((window.signal[i + 1] / 255) * 400);
+                ctx.beginPath();
+                ctx.moveTo(i, 400 - value);
+                ctx.lineTo(i + 1, 400 - nextValue);
+                ctx.stroke();
+            }
+        }
+
+    </script>
+</head>
+<body>
+<canvas id="can" width="600px" height="400px"></canvas>
+</body>
+</html>

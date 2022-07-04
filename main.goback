@@ -1,0 +1,63 @@
+package main
+
+import (
+	"fmt"
+	"github.com/disintegration/imaging"
+	"github.com/kbinani/screenshot"
+	"image"
+	"math"
+	"net"
+	"time"
+)
+
+func main() {
+	s, err := net.ResolveUDPAddr("udp4", "led.local:9000")
+	c, err := net.DialUDP("udp4", nil, s)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("The UDP server is %s\n", c.RemoteAddr().String())
+	defer c.Close()
+
+	for {
+		bounds := screenshot.GetDisplayBounds(0)
+
+		center := int(math.Round(float64(bounds.Max.Y) / 2))
+		img, _ := screenshot.CaptureRect(image.Rect(0, center-30, bounds.Max.X, center+30))
+		fixImage := imaging.AdjustGamma(img, 0.8)
+		fixImage = imaging.AdjustSaturation(fixImage, 50)
+
+		result := imaging.Resize(fixImage, 300, 1, imaging.Hamming)
+
+		data := make([]byte, 901)
+		data[0] = 100
+
+		for i := 1; i < 300; i++ {
+			rgb := result.Pix[i*4 : (i*4)+3]
+			data[(i*3)+1] = rgb[0]
+			data[(i*3)+2] = rgb[1] //byte(math.Round(math.Max(float64(rgb[1])-(255*0.2039*float64(rgb[2]/255)), 0)))
+			data[(i*3)+3] = rgb[2] //byte(math.Round(math.Max(float64(rgb[2])-(255*0.2196*float64(rgb[1]/255)), 0)))
+		}
+
+		_, err = c.Write(data)
+		if err != nil {
+			panic(err)
+		}
+
+		<-time.After(50 * time.Millisecond)
+	}
+}
+
+func Equal(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
